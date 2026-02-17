@@ -1,0 +1,2 @@
+# Coloca aquí archivos .sql de inicialización de la base de datos
+# Serán ejecutados automáticamente al iniciar el contenedor de MySQL

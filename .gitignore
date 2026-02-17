@@ -1,0 +1,45 @@
+# Variables de entorno (no commit)
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Archivos temporales
+*.log
+*.tmp
+*.bak
+*.backup
+*~
+
+# Node (si aplica)
+node_modules/
+npm-debug.log
+
+# Archivos excluidos del proyecto original
+.htpasswd
+
+# Backups de BD y volcados SQL (contienen datos sensibles)
+backup_*.sql
+docker/mysql/init/*.sql
+!docker/mysql/init/00_init_credentials.sql
+!docker/mysql/init/.gitkeep
+
+# Directorios de caché/compilación
+__pycache__/
+*.pyc
+.cache/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+europalaica_com_antes_utf8mb4.sql
