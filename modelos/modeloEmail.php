@@ -2386,6 +2386,11 @@ use PHPMailer\PHPMailer\PHPMailer;
 //use PHPMailer\PHPMailer\SMTP;//No lo necesito	
 use PHPMailer\PHPMailer\Exception;
 
+$emailConfigPath = __DIR__ . '/../usuariosConfig/email/configEmail.php';
+if (file_exists($emailConfigPath)) {
+	require_once $emailConfigPath;
+}
+
 /*----------- Fin Declarar "namespaces PHPMailer" con "use -----------------------------------*/
 
 /*=== INICIO ENVIAR EMAILS PERSONALIZADO A SOCIOS POR PRESIDENCIA, COORD, SIMPATIZANTES ========
@@ -2773,23 +2778,121 @@ function enviarEmailPhpMailer($datosEnvioEmail)
 		$phpMailerBase = __DIR__ . '/../usuariosLibs/classes/PHPMailer6';
 		$phpMailerException = $phpMailerBase . '/src/Exception.php';
 		$phpMailerClass = $phpMailerBase . '/src/PHPMailer.php';
+		$phpMailerSMTP = $phpMailerBase . '/src/SMTP.php';
 
-		if (!file_exists($phpMailerException) || !file_exists($phpMailerClass)) {
+		$emailConfig = [
+			'mode'          => 'mail',
+			'host'          => '',
+			'port'          => '',
+			'user'          => '',
+			'password'      => '',
+			'encryption'    => '',
+			'auth'          => '',
+			'debug'         => '0',
+			'timeout'       => '',
+			'sendmail_path' => '',
+		];
+
+		if (function_exists('getEmailTransportConfig')) {
+			$emailConfig = array_merge($emailConfig, getEmailTransportConfig());
+		}
+
+		$mailTransport = $emailConfig['mode'];
+		if ($mailTransport === 'smtp' && empty($emailConfig['host'])) {
+			$mailTransport = 'mail';
+		}
+
+		error_log('[modeloEmail] MAIL_TRANSPORT='.$mailTransport.' host='.$emailConfig['host'].' user='.$emailConfig['user']);
+
+		$missingFiles = [];
+		if (!file_exists($phpMailerException)) {
+			$missingFiles[] = 'Exception.php';
+		}
+		if (!file_exists($phpMailerClass)) {
+			$missingFiles[] = 'PHPMailer.php';
+		}
+		if ($mailTransport === 'smtp' && !file_exists($phpMailerSMTP)) {
+			$missingFiles[] = 'SMTP.php';
+		}
+
+		if (!empty($missingFiles)) {
 			$reEnvioEmail['codError'] = '90001';
-			$reEnvioEmail['errorMensaje'] = 'PHPMailer no encontrado en ' . $phpMailerBase;
-			$reEnvioEmail['textoComentarios'] = 'Error del sistema al enviar el email. Intentalo mas tarde.';
+			$reEnvioEmail['errorMensaje'] = 'Faltan archivos PHPMailer: ' . implode(', ', $missingFiles);
+			$reEnvioEmail['textoComentarios'] = 'Error del sistema al enviar el email. Inténtalo más tarde.';
 			return $reEnvioEmail;
 		}
 
 		require_once $phpMailerException;
 		require_once $phpMailerClass;//versión 6:5:4
-		//require_once  $phpMailerBase . '/src/SMTP.php';	//versión 6:5:4: No la necesito	
+		if ($mailTransport === 'smtp') {
+			require_once $phpMailerSMTP;
+		}
 
  	$mail = new PHPMailer(true); //defaults to using php "mail()"; 
-	                              //the true param means it will throw exceptions on errors, which we need to catch																														
+	                              //the true param means it will throw exceptions on errors, which we need to catch																							
 		try 
 		{			
 			$reEnvioEmail['codError'] = '00000';
+
+			if ($mailTransport === 'smtp') {
+				$mail->isSMTP();
+				$mail->Host = $emailConfig['host'];
+				if (!empty($emailConfig['port'])) {
+					$mail->Port = (int) $emailConfig['port'];
+				}
+
+				$smtpAuth = $emailConfig['auth'];
+				if ($smtpAuth === null || $smtpAuth === '') {
+					$smtpAuth = ($emailConfig['user'] !== '' || $emailConfig['password'] !== '');
+				} else {
+					$smtpAuth = filter_var($smtpAuth, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+					$smtpAuth = ($smtpAuth === null) ? true : $smtpAuth;
+				}
+				$mail->SMTPAuth = $smtpAuth;
+
+				if ($mail->SMTPAuth) {
+					if ($emailConfig['user'] !== '') {
+						$mail->Username = $emailConfig['user'];
+					}
+					if ($emailConfig['password'] !== '') {
+						$mail->Password = $emailConfig['password'];
+					}
+				}
+
+				$encryption = strtolower((string) $emailConfig['encryption']);
+				if (in_array($encryption, ['tls', 'starttls'], true)) {
+					$mail->SMTPSecure = 'tls';
+					$mail->SMTPAutoTLS = true;
+				} elseif (in_array($encryption, ['ssl', 'smtps'], true)) {
+					$mail->SMTPSecure = 'ssl';
+				}
+
+				if ($emailConfig['timeout'] !== '') {
+					$mail->Timeout = (int) $emailConfig['timeout'];
+				}
+
+				$debugLevel = (int) $emailConfig['debug'];
+				if ($debugLevel > 0) {
+					$mail->SMTPDebug = $debugLevel;
+					$mail->Debugoutput = 'error_log';
+				}
+
+				$verifyPeerFlag = strtolower((string) ($emailConfig['verify_peer'] ?? ''));
+				if ($verifyPeerFlag === '0' || $verifyPeerFlag === 'false') {
+					$mail->SMTPOptions = [
+						'ssl' => [
+							'verify_peer' => false,
+							'verify_peer_name' => false,
+							'allow_self_signed' => true,
+						],
+					];
+				}
+			} elseif ($mailTransport === 'sendmail') {
+				$mail->isSendmail();
+				if (!empty($emailConfig['sendmail_path'])) {
+					$mail->Sendmail = $emailConfig['sendmail_path'];
+				}
+			}
 			
 		 $mail->CharSet = "utf-8";//para sustituir el juego de caracteres 'iso-8859-1' por "utf-8"	  
 

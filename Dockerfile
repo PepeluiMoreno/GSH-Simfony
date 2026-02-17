@@ -34,7 +34,7 @@ WORKDIR /var/www/html
 COPY --chown=1000:1000 . .
 
 # Crear directorios para archivos subidos y temporales
-RUN mkdir -p /var/www/html/archivos /var/www/html/tmp && \
+RUN mkdir -p /var/www/html/archivos /var/www/html/tmp /var/www/html/tmp/emails && \
     chown -R jose:jose /var/www/html && \
     chmod 755 /var/www/html/archivos /var/www/html/tmp
 
